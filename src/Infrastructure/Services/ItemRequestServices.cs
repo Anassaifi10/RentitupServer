@@ -1,18 +1,23 @@
-﻿using MediatR;
+﻿using AutoMapper;
+using MediatR;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using RentalApp.Application.Common;
 using RentalApp.Application.Common.Interfaces;
+using RentalApp.Application.Common.Mappings;
 using RentalApp.Application.Common.Models;
+using RentalApp.Application.ItemRequest.Queries.GetMyRequest;
 using RentalApp.Domain.Entities;
 using RentalApp.Domain.Enums;
 
 namespace RentalApp.Infrastructure.Services;
-public class ItemRequestServices(IApplicationDbContext context, IUser user, IHubContext<RentalHub, IRentalHub> hub) : IItemRequestService
+public class ItemRequestServices(IApplicationDbContext context, IUser user, IHubContext<RentalHub, IRentalHub> hub,IMapper mapper) : IItemRequestService
 {
     private readonly IApplicationDbContext _context = context;
     private readonly IUser _user = user;
     private readonly IHubContext<RentalHub, IRentalHub> _rentalHub = hub;
+
+    private readonly IMapper _mapper = mapper;
     public async Task<Result> AcceptItemRequest(string requestId)
     {
         try
@@ -58,6 +63,39 @@ public class ItemRequestServices(IApplicationDbContext context, IUser user, IHub
             return Result.Failure([ex.Message]);
         }
     }
+
+    public async Task<(Result, List<RequestVm>)> getMyAllRequest()
+    {
+        try
+        {
+            if(string.IsNullOrEmpty(_user.Id))
+            {
+                return (Result.Failure(["Invalid User Id"]), []);
+            }
+            var userreq=await _context.UserAccounts.Where(x=>x.Id == _user.Id).Include(x=>x.RentalRequests).SelectMany(x=>x.RentalRequests).ProjectToListAsync<RequestVm>(_mapper.ConfigurationProvider);
+
+            return (Result.Success(), userreq);
+
+        }
+        catch (Exception ex)
+        {
+            return (Result.Failure([ex.Message]), []);  
+        }
+    }
+    public async Task<(Result, List<RequestVm>)> getAllRequest()
+    {
+        try
+        {
+            var myItems=await _context.Items.Where(x=>x.OwnerId==_user.Id).Include(x=>x.RentalRequests).SelectMany(x=>x.RentalRequests).ProjectToListAsync<RequestVm>(_mapper.ConfigurationProvider);
+            return (Result.Success(),myItems);
+
+        }
+        catch (Exception ex)
+        {
+            return (Result.Failure([ex.Message]), []);
+        }
+    }
+
     public async Task<Result> SendItemRequest(string itemId, string message, decimal rentLength)
     {
         try
@@ -92,7 +130,7 @@ public class ItemRequestServices(IApplicationDbContext context, IUser user, IHub
             };
             await _context.RentalRequests.AddAsync(newRequest);
             await _context.SaveChangesAsync(CancellationToken.None);
-            await _rentalHub.Clients.User(Item.OwnerId).ReciveRequest(message);
+            await _rentalHub.Clients.User(Item.OwnerId).ReciveRequest(newRequest.Id??"",message);
             await _rentalHub.Clients.User(_user.Id ?? "").SendRequestSuccessfully();
             return Result.Success();
         }
@@ -101,5 +139,7 @@ public class ItemRequestServices(IApplicationDbContext context, IUser user, IHub
             return Result.Failure([ex.Message]);
         }
     }
+
+
 } 
 

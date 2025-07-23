@@ -20,12 +20,15 @@ public static class DependencyInjection
         var connectionString = builder.Configuration.GetConnectionString("RentalAppDb");
         Guard.Against.Null(connectionString, message: "Connection string 'RentalAppDb' not found.");
         builder.Services.Configure<CloudinarySetting>(builder.Configuration.GetSection("CloudinarySettings"));
+        builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("SendGrid"));
 
         builder.Services.AddScoped<ISaveChangesInterceptor, AuditableEntityInterceptor>();
         builder.Services.AddScoped<ISaveChangesInterceptor, DispatchDomainEventsInterceptor>();
         builder.Services.AddTransient<IImageServices, ImageServices>();
         builder.Services.AddTransient<IItemServices, ItemServices>();
         builder.Services.AddTransient<IItemRequestService, ItemRequestServices>();
+        builder.Services.AddTransient<IEmailSenderServices, SendGridEmailServices>();
+        builder.Services.AddTransient<IUserAccountServices, UserAccountServices>();
 
         builder.Services.AddDbContext<ApplicationDbContext>((sp, options) =>
         {
@@ -39,7 +42,23 @@ public static class DependencyInjection
         builder.Services.AddScoped<ApplicationDbContextInitialiser>();
 
         builder.Services.AddAuthentication()
-            .AddBearerToken(IdentityConstants.BearerScheme);
+            .AddBearerToken(IdentityConstants.BearerScheme, op =>
+            {
+                op.Events = new AspNetCore.Authentication.BearerToken.BearerTokenEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.HttpContext.Request.Query["access_token"];
+                        var path = context.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/Rentituphub"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
+            });
 
         builder.Services.AddAuthorizationBuilder();
 
@@ -59,7 +78,7 @@ public static class DependencyInjection
         {
             option.AddPolicy("CORS", pol =>
             {
-                pol.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                pol.WithOrigins(["http://localhost:5173"]).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
             });
         });
 

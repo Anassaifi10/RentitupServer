@@ -28,16 +28,12 @@ public class UplodeImageCommandHandler(IApplicationDbContext context, IImageServ
         {
             return Result.Failure(["Image info not Found"]);
         }
-        var imageinfo = request.imageInfo.Split("%%");
-        if ( string.IsNullOrEmpty(imageinfo[0]) || string.IsNullOrEmpty(imageinfo[1]))
-        {
-            return Result.Failure(["image information not found"]);
-        }
+        
         if (request.Image == null)
         {
             return Result.Failure(["Image not found"]);
         }
-        return await _imageServices.UplodeImage(request.Image, imageinfo[0], imageinfo[1]);
+        return await _imageServices.UplodeImage(request.Image, "useritem", request.imageInfo);
 
     }
 }

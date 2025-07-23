@@ -28,7 +28,31 @@ public class IdentityService : IIdentityService
 
         return user?.UserName;
     }
-
+    public async Task<Result> changePasswordAsync(string userId,string ?oldpassword,string ?newpassword)
+    {
+        try
+        {
+            var user=await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Result.Failure(["User Not Found"]);
+            }
+            if(string.IsNullOrEmpty(oldpassword)||string.IsNullOrEmpty(newpassword))
+            {
+                return Result.Failure(["Old password or new password must not be empty"]);
+            }
+            var respo=await _userManager.ChangePasswordAsync(user, oldpassword, newpassword);
+            if (respo.Succeeded)
+            {
+                return Result.Success();
+            }
+            return Result.Failure(["Error While Updating the Password"]);
+        }
+        catch (Exception ex)
+        {
+            return Result.Failure([ex.Message]);    
+        }
+    }
     public async Task<(Result Result, string UserId)> CreateUserAsync(string userName, string password)
     {
         var user = new ApplicationUser

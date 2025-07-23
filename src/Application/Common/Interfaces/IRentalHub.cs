@@ -8,10 +8,15 @@ namespace RentalApp.Application.Common.Interfaces;
 public interface IRentalHub
 {
     Task SendRequest(string itemId);
-    Task ReciveRequest(string message);
-    Task SendRequestSuccessfully();
+    Task ReciveRequest(string requestId,string message);
+    Task SendRequestSuccessfully(); 
 
     Task AccepRequest();
 
     Task AccepRequestSuccessfully();
+
+    Task ReceiveMessage(string message);   
+
+    Task SendMessageSuccessfully();
+    
 }

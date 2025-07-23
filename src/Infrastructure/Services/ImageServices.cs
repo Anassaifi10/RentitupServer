@@ -31,8 +31,26 @@ public class ImageServices : IImageServices
             foldername = foldername.ToLower();
 
             string filePath = foldername + "/" + Id;
-            var deleteParams = new DeletionParams(filePath);
-            await _cloudinary.DestroyAsync(deleteParams);
+
+            var listParams = new ListResourcesByPrefixParams
+            {
+                Prefix = $"{foldername}/{Id}/", // This is the correct way
+                MaxResults = 100
+            };
+            var listResult = await _cloudinary.ListResourcesAsync(listParams);
+
+            if (listResult.Resources?.Any() == true)
+            {
+                var publicIds = listResult.Resources.Select(r => r.PublicId).ToList();
+
+                var delParams = new DelResParams
+                {
+                    PublicIds = publicIds
+                };
+
+                await _cloudinary.DeleteResourcesAsync(delParams);
+            }
+
 
             await using var stream = file.OpenReadStream();
             var uploadParams = new ImageUploadParams
